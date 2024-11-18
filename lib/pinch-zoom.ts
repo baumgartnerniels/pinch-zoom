@@ -314,57 +314,58 @@ export default class PinchZoom extends HTMLElement {
     this.setTransform({ allowChangeEvent: true });
   }
 
-  private _onWheel(event: WheelEvent) {
-    if (!this._positioningEl) return;
-    event.preventDefault();
+private _onWheel(event: WheelEvent) {
+  if (!this._positioningEl) return;
+  event.preventDefault();
 
-    const currentRect = this._positioningEl.getBoundingClientRect();
-    let { deltaY } = event;
-    const { ctrlKey, deltaMode } = event;
+  const currentRect = this._positioningEl.getBoundingClientRect();
+  let { deltaX, deltaY } = event;
+  const { ctrlKey, deltaMode } = event;
 
-    if (deltaMode === 1) { // 1 is "lines", 0 is "pixels"
-      // Firefox uses "lines" for some types of mouse
-      deltaY *= 15;
-    }
-
-    // ctrlKey is true when pinch-zooming on a trackpad.
-    const divisor = ctrlKey ? 100 : 300;
-    const scaleDiff = 1 - deltaY / divisor;
-
-    this._applyChange({
-      scaleDiff,
-      originX: event.clientX - currentRect.left,
-      originY: event.clientY - currentRect.top,
-      allowChangeEvent: true,
-    });
+  if (deltaMode === 1) { // 1 is "lines", 0 is "pixels"
+    // Firefox uses "lines" for some types of mouse
+    deltaY *= 15;
+    deltaX *= 15;
   }
 
-  private _onPointerMove(previousPointers: Pointer[], currentPointers: Pointer[]) {
-    if (!this._positioningEl) return;
+  // ctrlKey is true when pinch-zooming on a trackpad.
+  const divisor = ctrlKey ? 100 : 300;
+  const scaleDiff = 1 - deltaY / divisor;
 
-    // Combine next points with previous points
-    const currentRect = this._positioningEl.getBoundingClientRect();
+  this._applyChange({
+    scaleDiff,
+    originX: event.clientX - currentRect.left,
+    originY: event.clientY - currentRect.top,
+    panX: -deltaX,  // Apply horizontal panning
+    panY: -deltaY,  // Apply vertical panning
+    allowChangeEvent: true,
+  });
+}
+private _onPointerMove(previousPointers: Pointer[], currentPointers: Pointer[]) {
+  if (!this._positioningEl) return;
 
-    // For calculating panning movement
-    const prevMidpoint = getMidpoint(previousPointers[0], previousPointers[1]);
-    const newMidpoint = getMidpoint(currentPointers[0], currentPointers[1]);
+  // Combine next points with previous points
+  const currentRect = this._positioningEl.getBoundingClientRect();
 
-    // Midpoint within the element
-    const originX = prevMidpoint.clientX - currentRect.left;
-    const originY = prevMidpoint.clientY - currentRect.top;
+  // For calculating panning movement
+  const prevMidpoint = getMidpoint(previousPointers[0], previousPointers[1]);
+  const newMidpoint = getMidpoint(currentPointers[0], currentPointers[1]);
 
-    // Calculate the desired change in scale
-    const prevDistance = getDistance(previousPointers[0], previousPointers[1]);
-    const newDistance = getDistance(currentPointers[0], currentPointers[1]);
-    const scaleDiff = prevDistance ? newDistance / prevDistance : 1;
+  // Midpoint within the element
+  const originX = prevMidpoint.clientX - currentRect.left;
+  const originY = prevMidpoint.clientY - currentRect.top;
 
-    this._applyChange({
-      originX, originY, scaleDiff,
-      panX: newMidpoint.clientX - prevMidpoint.clientX,
-      panY: newMidpoint.clientY - prevMidpoint.clientY,
-      allowChangeEvent: true,
-    });
-  }
+  // Calculate the desired change in scale
+  const prevDistance = getDistance(previousPointers[0], previousPointers[1]);
+  const newDistance = getDistance(currentPointers[0], currentPointers[1]);
+  const scaleDiff = prevDistance ? newDistance / prevDistance : 1;
+
+  // Disable panning by removing panX and panY
+  this._applyChange({
+    originX, originY, scaleDiff,
+    allowChangeEvent: true,
+  });
+}
 
   /** Transform the view & fire a change event */
   private _applyChange(opts: ApplyChangeOpts = {}) {
